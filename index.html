@@ -2,73 +2,112 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Discord Bot Status</title>
+  <title>Bot Status Page</title>
   <style>
-    body {
-      background: #0e0e0e;
+    html, body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', sans-serif;
+      overflow-x: hidden;
       color: white;
-      font-family: sans-serif;
-      padding: 20px;
     }
-    .monitor {
-      background: #1a1a1a;
-      padding: 15px;
-      margin-top: 10px;
-      border-radius: 8px;
-      position: relative;
+
+    canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: -1;
     }
-    .status-dot {
-      height: 12px;
-      width: 12px;
-      border-radius: 50%;
-      display: inline-block;
-      margin-right: 10px;
+
+    .container {
+      padding: 30px;
+      text-align: center;
     }
-    .green { background: #00ff00; }
-    .red { background: #ff0000; }
-    .offline-line {
-      width: 100%;
-      height: 4px;
-      background: red;
-      margin-top: 8px;
+
+    h1 {
+      font-size: 2em;
+      margin-bottom: 20px;
     }
+
     input, button {
       padding: 10px;
       margin: 5px;
-      background: #222;
-      border: none;
+      background: rgba(255, 255, 255, 0.1);
       color: white;
-      border-radius: 5px;
+      border: 1px solid white;
+      border-radius: 6px;
+      outline: none;
+    }
+
+    .monitor {
+      background: rgba(0, 0, 0, 0.5);
+      margin-top: 15px;
+      padding: 15px;
+      border-radius: 10px;
+      position: relative;
+      border: 1px solid rgba(255, 0, 0, 0.3);
+    }
+
+    .red-line {
+      width: 100%;
+      height: 4px;
+      background: red;
+      margin-top: 10px;
+      border-radius: 2px;
+    }
+
+    button.remove {
+      background: red;
+      color: white;
+      border: none;
+      margin-left: 10px;
     }
   </style>
 </head>
 <body>
-  <h1>Discord Bot Status</h1>
-  <input type="text" id="botId" placeholder="Bot ID" />
-  <input type="text" id="botName" placeholder="Bot Name (optional)" />
-  <button onclick="addMonitor()">Add Monitor</button>
+  <canvas id="gradientCanvas"></canvas>
+  <div class="container">
+    <h1>Discord Bot Status</h1>
+    <input id="botId" placeholder="Bot ID">
+    <input id="botName" placeholder="Bot Name (optional)">
+    <button onclick="addMonitor()">Add Monitor</button>
 
-  <div id="monitorList"></div>
+    <div id="monitorList"></div>
+  </div>
 
   <script>
-    const monitorList = document.getElementById('monitorList');
+    const canvas = document.getElementById("gradientCanvas");
+    const ctx = canvas.getContext("2d");
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      drawGradient();
+    }
+    function drawGradient() {
+      let grad = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+      grad.addColorStop(0, "#1a2a6c");
+      grad.addColorStop(0.5, "#b21f1f");
+      grad.addColorStop(1, "#fdbb2d");
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+    window.addEventListener("resize", resizeCanvas);
+    resizeCanvas();
 
     function getMonitors() {
-      return JSON.parse(localStorage.getItem('monitors') || '[]');
+      return JSON.parse(localStorage.getItem("monitors") || "[]");
     }
 
     function saveMonitors(monitors) {
-      localStorage.setItem('monitors', JSON.stringify(monitors));
+      localStorage.setItem("monitors", JSON.stringify(monitors));
     }
 
     function addMonitor() {
-      const id = document.getElementById('botId').value.trim();
-      const name = document.getElementById('botName').value.trim() || id;
-
-      if (!id) return alert("Enter a Bot ID");
-
+      const id = document.getElementById("botId").value.trim();
+      const name = document.getElementById("botName").value.trim() || id;
+      if (!id) return alert("Bot ID required");
       const monitors = getMonitors();
-      monitors.push({ id, name, checks: 0, up: 0 });
+      monitors.push({ id, name });
       saveMonitors(monitors);
       renderMonitors();
     }
@@ -91,36 +130,23 @@
 
     async function renderMonitors() {
       const monitors = getMonitors();
-      monitorList.innerHTML = "";
-
+      const list = document.getElementById("monitorList");
+      list.innerHTML = "";
       for (let i = 0; i < monitors.length; i++) {
         const monitor = monitors[i];
         const isOnline = await checkStatus(monitor.id);
 
-        monitor.checks += 1;
-        if (isOnline) monitor.up += 1;
-
-        const uptime = ((monitor.up / monitor.checks) * 100).toFixed(2);
-
-        const div = document.createElement('div');
-        div.className = 'monitor';
+        const div = document.createElement("div");
+        div.className = "monitor";
         div.innerHTML = `
-          <div>
-            <span class="status-dot ${isOnline ? 'green' : 'red'}"></span>
-            <strong>${monitor.name}</strong> (ID: ${monitor.id})
-            <button onclick="removeMonitor(${i})">Remove</button>
-          </div>
-          <div>Uptime: ${uptime}%</div>
-          ${!isOnline ? '<div class="offline-line"></div>' : ''}
+          <strong>${monitor.name}</strong> (ID: ${monitor.id})
+          <button class="remove" onclick="removeMonitor(${i})">Remove</button>
+          ${!isOnline ? `<div class="red-line"></div>` : ""}
         `;
-
-        monitorList.appendChild(div);
+        list.appendChild(div);
       }
-
-      saveMonitors(monitors);
     }
 
-    // Auto refresh every 10 seconds
     setInterval(renderMonitors, 10000);
     renderMonitors();
   </script>
