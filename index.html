@@ -2,124 +2,166 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Discord Bot Uptime Monitor</title>
+  <title>Bot Uptime Monitor</title>
   <style>
     body {
       margin: 0;
       font-family: 'Segoe UI', sans-serif;
-      background: linear-gradient(135deg, #1e0037, #ff6600);
+      background: linear-gradient(135deg, #000428, #004e92);
       color: white;
-      text-align: center;
+      height: 100vh;
+      overflow: hidden;
     }
+
     h1 {
-      margin-top: 40px;
-      font-size: 2rem;
+      text-align: center;
+      margin-top: 20px;
     }
-    .input-group {
-      margin: 20px auto;
+
+    #addForm {
       display: flex;
       justify-content: center;
-      flex-wrap: wrap;
       gap: 10px;
+      margin-top: 20px;
     }
+
     input, button {
       padding: 10px;
-      border-radius: 6px;
       border: none;
-      font-size: 1rem;
+      border-radius: 8px;
+      outline: none;
     }
+
     input {
-      width: 180px;
+      width: 200px;
     }
+
     button {
-      background: crimson;
-      color: white;
+      background: linear-gradient(90deg, #00c9ff, #92fe9d);
+      color: #000;
+      font-weight: bold;
       cursor: pointer;
     }
+
+    .monitor-container {
+      max-width: 600px;
+      margin: 30px auto;
+    }
+
     .monitor {
-      background: rgba(0, 0, 0, 0.3);
-      margin: 10px auto;
-      padding: 15px;
-      width: 90%;
-      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      margin-bottom: 15px;
+      padding: 20px;
+      position: relative;
+      overflow: hidden;
     }
+
+    .monitor h3 {
+      margin: 0 0 5px;
+    }
+
     .status-bar {
-      margin-top: 10px;
-      height: 6px;
+      height: 10px;
+      border-radius: 5px;
       background: red;
-      border-radius: 6px;
+      margin-top: 10px;
+      transition: background 0.5s ease;
     }
-    @media (max-width: 600px) {
-      input {
-        width: 100%;
-      }
+
+    canvas#bgCanvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: -1;
     }
   </style>
 </head>
 <body>
-  <h1>Discord Bot Status</h1>
-  <div class="input-group">
-    <input type="text" id="botUrl" placeholder="Bot Ping URL (e.g. https://yourbot.glitch.me)" />
-    <input type="text" id="botName" placeholder="Bot Name (optional)" />
-    <button onclick="addMonitor()">Add Monitor</button>
+  <canvas id="bgCanvas"></canvas>
+
+  <h1>Bot Uptime Monitor</h1>
+  <div id="addForm">
+    <input type="text" id="botName" placeholder="Bot Name">
+    <input type="text" id="botURL" placeholder="Ping URL (https://...)">
+    <button onclick="addMonitor()">Add</button>
   </div>
-  <div id="monitors"></div>
+
+  <div class="monitor-container" id="monitorContainer"></div>
 
   <script>
-    const monitorContainer = document.getElementById("monitors");
+    const monitors = JSON.parse(localStorage.getItem("monitors")) || [];
 
-    function loadMonitors() {
-      const monitors = JSON.parse(localStorage.getItem("monitors") || "[]");
-      monitorContainer.innerHTML = "";
-      monitors.forEach((monitor, index) => {
-        const div = document.createElement("div");
-        div.className = "monitor";
-        div.innerHTML = `
-          <strong>${monitor.name || "Bot " + (index + 1)}</strong><br/>
-          <small>${monitor.url}</small><br/>
-          <button onclick="removeMonitor(${index})">Remove</button>
-          <div class="status-bar" id="status-${index}"></div>
-        `;
-        monitorContainer.appendChild(div);
-        pingBot(index, monitor.url);
-        setInterval(() => pingBot(index, monitor.url), 15000); // every 15 sec
-      });
+    function saveMonitors() {
+      localStorage.setItem("monitors", JSON.stringify(monitors));
     }
 
     function addMonitor() {
-      const url = document.getElementById("botUrl").value.trim();
-      const name = document.getElementById("botName").value.trim();
-      if (!url) return alert("Bot ping URL is required!");
-      const monitors = JSON.parse(localStorage.getItem("monitors") || "[]");
-      monitors.push({ url, name });
-      localStorage.setItem("monitors", JSON.stringify(monitors));
-      loadMonitors();
+      const name = document.getElementById("botName").value;
+      const url = document.getElementById("botURL").value;
+      if (!name || !url) return alert("Please fill all fields.");
+      monitors.push({ name, url });
+      saveMonitors();
+      renderMonitors();
     }
 
-    function removeMonitor(index) {
-      const monitors = JSON.parse(localStorage.getItem("monitors") || "[]");
-      monitors.splice(index, 1);
-      localStorage.setItem("monitors", JSON.stringify(monitors));
-      loadMonitors();
+    function renderMonitors() {
+      const container = document.getElementById("monitorContainer");
+      container.innerHTML = "";
+      monitors.forEach((bot, index) => {
+        const div = document.createElement("div");
+        div.className = "monitor";
+        div.innerHTML = `
+          <h3>${bot.name}</h3>
+          <div class="status-bar" id="bar${index}"></div>
+        `;
+        container.appendChild(div);
+        pingBot(bot.url, index);
+      });
     }
 
-    async function pingBot(index, url) {
+    async function pingBot(url, index) {
       try {
-        const res = await fetch(url, { method: "GET", cache: "no-store" });
-        const status = document.getElementById(`status-${index}`);
+        const res = await fetch(url, { cache: "no-store" });
+        const bar = document.getElementById("bar" + index);
         if (res.ok) {
-          status.style.background = "limegreen";
+          bar.style.background = "linear-gradient(90deg, #00ff87, #60efff)";
         } else {
-          status.style.background = "red";
+          bar.style.background = "red";
         }
-      } catch (e) {
-        const status = document.getElementById(`status-${index}`);
-        if (status) status.style.background = "red";
+      } catch {
+        const bar = document.getElementById("bar" + index);
+        bar.style.background = "red";
       }
+
+      setTimeout(() => pingBot(url, index), 10000); // recheck every 10 seconds
     }
 
-    loadMonitors();
-  </script>
-</body>
-</html>
+    renderMonitors();
+
+    // Animated Canvas Background
+    const canvas = document.getElementById("bgCanvas");
+    const ctx = canvas.getContext("2d");
+    canvas.width = innerWidth;
+    canvas.height = innerHeight;
+
+    let dots = Array.from({ length: 100 }, () => ({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      r: Math.random() * 3 + 1,
+      dx: (Math.random() - 0.5) * 0.5,
+      dy: (Math.random() - 0.5) * 0.5
+    }));
+
+    function animate() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      dots.forEach(dot => {
+        ctx.beginPath();
+        ctx.arc(dot.x, dot.y, dot.r, 0, Math.PI * 2);
+        ctx.fillStyle = "#00ffe0";
+        ctx.fill();
+        dot.x += dot.dx;
+        dot.y += dot.dy;
+
+        if (dot.x < 0 || dot.x > canvas.width) dot.dx *= -1;
+        if (dot.y < 0 || dot.y > canvas.height) dot.dy *= -1;
